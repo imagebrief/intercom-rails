@@ -10,3 +10,5 @@ spike.rb
 html
 .idea
 .ruby-version
+vendor/*
+gemfiles/*.lock

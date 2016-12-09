@@ -8,7 +8,7 @@ describe IntercomRails::ScriptTag do
   end
 
   it 'should output html_safe?' do
-    expect(ScriptTag.generate({}).html_safe?).to be(true)
+    expect(ScriptTag.new({}).to_s.html_safe?).to be(true)
   end
 
   it 'should convert times to unix timestamps' do
@@ -27,6 +27,15 @@ describe IntercomRails::ScriptTag do
 
     expect(time_from_time_with_zone.intercom_settings[:created_at]).to eq(utc_time.to_i)
   end
+  context 'session' do
+    before do
+      IntercomRails.config.session_duration = 60000
+    end
+    it 'displays session_duration' do
+      script_tag = ScriptTag.new()
+      expect(script_tag.intercom_settings[:session_duration]).to eq(60000)
+    end
+  end
 
   it 'strips out nil entries for standard attributes' do
     %w(name email user_id).each do |standard_attribute|
@@ -44,7 +53,17 @@ describe IntercomRails::ScriptTag do
   it 'should escape html attributes' do
     nasty_email = "</script><script>alert('sup?');</script>"
     script_tag = ScriptTag.new(:user_details => {:email => nasty_email})
-    expect(script_tag.output).not_to include(nasty_email)
+    expect(script_tag.to_s).not_to include(nasty_email)
+  end
+
+  it 'should escape html attributes in app_id' do
+    email = "bob@foo.com"
+    before = IntercomRails.config.app_id
+    nasty_app_id = "</script><script>alert('sup?');</script>"
+    IntercomRails.config.app_id = nasty_app_id
+    script_tag = ScriptTag.new(:user_details => {:email => email})
+    expect(script_tag.to_s).not_to include(nasty_app_id)
+    IntercomRails.config.app_id = before
   end
 
   context 'secure mode - user_hash' do
@@ -100,6 +119,15 @@ describe IntercomRails::ScriptTag do
       IntercomRails.config.inbox.style = :custom
       expect(ScriptTag.new.intercom_settings['widget']).to eq({'activator' => '#Intercom'})
     end
+    it 'knows about :custom_activator' do
+      IntercomRails.config.inbox.style = :custom
+      IntercomRails.config.inbox.custom_activator = '.intercom'
+      expect(ScriptTag.new.intercom_settings['widget']).to eq({'activator' => '.intercom'})
+    end
+    it 'knows about :hide_default_launcher' do
+      IntercomRails.config.hide_default_launcher = true
+      expect(ScriptTag.new.intercom_settings['hide_default_launcher']).to eq(true)
+    end
   end
 
   context 'company' do
@@ -127,4 +155,82 @@ describe IntercomRails::ScriptTag do
       expect(script_tag.valid?).to eq(false)
     end
   end
+
+  context 'content security policy support' do
+    it 'returns a valid sha256 hash for the CSP header' do
+      #
+      # If default values change, re-generate the string below using this one
+      # liner:
+      #  echo "sha256-$(echo -n "js code" | openssl dgst -sha256 -binary | openssl base64)"
+      # or an online service like https://report-uri.io/home/hash/
+      #
+      # For instance:
+      #  echo "sha256-$(echo -n "alert('hello');" | openssl dgst -sha256 -binary | openssl base64)"
+      #  sha256-gj4FLpwFgWrJxA7NLcFCWSwEF/PMnmWidszB6OONAAo=
+      #
+      script_tag = ScriptTag.new(:user_details => {
+        :app_id => 'csp_sha_test',
+        :email => 'marco@intercom.io',
+        :user_id => 'marco',
+      })
+      expect(script_tag.csp_sha256).to eq("'sha256-qLRbekKD6dEDMyLKPNFYpokzwYCz+WeNPqJE603mT24='")
+    end
+
+    it 'inserts a valid nonce if present' do
+      script_tag = ScriptTag.new(:user_details => {
+        :app_id => 'csp_sha_test',
+        :email => 'marco@intercom.io',
+        :user_id => 'marco',
+      },
+        :nonce => 'pJwtLVnwiMaPCxpb41KZguOcC5mGUYD+8RNGcJSlR94=')
+      expect(script_tag.to_s).to include('nonce="pJwtLVnwiMaPCxpb41KZguOcC5mGUYD+8RNGcJSlR94="')
+    end
+
+    it 'does not insert a nasty nonce if present' do
+      script_tag = ScriptTag.new(:user_details => {
+        :app_id => 'csp_sha_test',
+        :email => 'marco@intercom.io',
+        :user_id => 'marco',
+      },
+        :nonce => '>alert(1)</script><script>')
+      expect(script_tag.to_s).not_to include('>alert(1)</script><script>')
+    end
+  end
+
+  context 'request specific parameters' do
+    it 'does not complain when no controller is found' do
+      script_tag = ScriptTag.new(utm_source: 'google')
+      expect(script_tag.intercom_settings[:utm_source]).to eq(nil)
+    end
+
+    it 'accepts request specific defined lead attributes and rejects rest' do
+      IntercomRails.config.user.lead_attributes = %w(utm_source ref_data)
+
+      controller_with_request = Object.new
+      controller_with_request.instance_eval do
+        def intercom_custom_data
+          Object.new.tap do |o|
+            o.instance_eval do
+              def user
+                {
+                  utm_source: 'google',
+                  ref_data: 12345,
+                  ad_data: 'something1234'
+                }
+              end
+            end
+          end
+        end
+      end
+
+      script_tag = ScriptTag.new(controller: controller_with_request)
+
+      expect(script_tag.intercom_settings[:utm_source]).to eq('google')
+      expect(script_tag.intercom_settings[:ref_data]).to eq(12345)
+      # Rejects
+      expect(script_tag.intercom_settings[:ad_data]).to eq(nil)
+    end
+
+  end
+
 end

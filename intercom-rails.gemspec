@@ -7,6 +7,7 @@ Gem::Specification.new do |s|
   s.name        = "intercom-rails"
   s.version     = IntercomRails::VERSION
   s.authors     = ["Ben McRedmond", "Ciaran Lee", "Darragh Curran",]
+  s.license     = "MIT"
   s.email       = ["ben@intercom.io", "ciaran@intercom.io", "darragh@intercom.io"]
   s.homepage    = "http://www.intercom.io"
   s.summary     = %q{Rails helper for emitting javascript script tags for Intercom}
@@ -24,7 +25,7 @@ Gem::Specification.new do |s|
   s.add_development_dependency 'rspec-rails', '~> 3.1'
   s.add_development_dependency 'pry'
   s.add_development_dependency 'sinatra', '~> 1.4.5'
-  s.add_development_dependency 'thin', '~> 1.6.2'
+  s.add_development_dependency 'thin', '~> 1.7.0'
   s.add_development_dependency 'tzinfo'
   s.add_development_dependency 'gem-release'
 end

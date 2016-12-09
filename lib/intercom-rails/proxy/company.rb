@@ -11,14 +11,6 @@ module IntercomRails
       config_delegator :plan
       config_delegator :monthly_spend
 
-      def self.companies_for_user(user)
-        return unless config(:user).company_association.present?
-        companies = config(:user).company_association.call(user.user)
-        return unless companies.kind_of?(Array)
-
-        companies.map { |company| new(company) }.select { |company_proxy| company_proxy.valid? }
-      end
-
       def self.current_in_context(search_object)
         begin
           if config.current.present?
@@ -32,6 +24,8 @@ module IntercomRails
       end
 
       def valid?
+        return false if company.blank? || company.respond_to?(:new_record?) && company.new_record?
+        return false if config.company.exclude_if.present? && config.company.exclude_if.call(company)
         company.present? && identity_present?
       end
 

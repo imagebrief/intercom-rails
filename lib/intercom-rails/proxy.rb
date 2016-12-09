@@ -72,7 +72,7 @@ module IntercomRails
       end
 
       def identity_present?
-        self.class.identity_attributes.any? { |attribute_name| proxied_object.respond_to?(attribute_name) && proxied_object.send(attribute_name).present? }
+        self.class.identity_attributes.any? { |attribute_name| (proxied_object.is_a?(Hash) && proxied_object[attribute_name].present?) || (proxied_object.respond_to?(attribute_name) && proxied_object.send(attribute_name).present?) }
       end
 
       def self.proxy_delegator(attribute_name, options = {})
@@ -129,16 +129,19 @@ module IntercomRails
 
       def custom_data_from_config
         return {} if config.custom_data.blank?
-        config.custom_data.reduce({}) do |custom_data, (k,v)|
-          custom_data.merge(k => custom_data_value_from_proc_or_symbol(v))
-        end
+        custom_data_value(config.custom_data)
       end
 
-      def custom_data_value_from_proc_or_symbol(proc_or_symbol)
-        if proc_or_symbol.kind_of?(Symbol)
-          proxied_object.send(proc_or_symbol)
-        elsif proc_or_symbol.kind_of?(Proc)
-          proc_or_symbol.call(proxied_object)
+      def custom_data_value(proc_or_symbol_or_hash)
+        case proc_or_symbol_or_hash
+        when Symbol
+          proxied_object.send(proc_or_symbol_or_hash)
+        when Proc
+          proc_or_symbol_or_hash.call(proxied_object)
+        when Hash
+          proc_or_symbol_or_hash.reduce({}) do |custom_data, (k,v)|
+            custom_data.merge(k => custom_data_value(v))
+          end
         end
       end
 
