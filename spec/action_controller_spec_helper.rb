@@ -2,7 +2,7 @@ require 'spec_helper'
 
 require 'action_controller'
 
-require "rails/all"
+require 'rails'
 require 'rspec/rails'
 
 module Rails
@@ -18,6 +18,8 @@ end
 
 module IntercomRails
   class Application < Rails::Application
+    config.secret_key_base = 'secret_key_base'
+
     def routes
       TestRoutes
     end
@@ -27,7 +29,11 @@ end
 class ActionController::Base
   include IntercomRails::CustomDataHelper
   include IntercomRails::AutoInclude::Method
-  after_filter :intercom_rails_auto_include
+  if respond_to? :after_action
+    after_action :intercom_rails_auto_include
+  else
+    after_filter :intercom_rails_auto_include
+  end
 
   include TestRoutes.url_helpers
   include TestRoutes.mounted_helpers

@@ -10,12 +10,19 @@ module IntercomRails
     class Filter
 
       CLOSING_BODY_TAG = %r{</body>}
+      BLACKLISTED_CONTROLLER_NAMES = ["Devise::PasswordsController"]
 
       def self.filter(controller)
+        return if BLACKLISTED_CONTROLLER_NAMES.include?(controller.class.name)
         auto_include_filter = new(controller)
         return unless auto_include_filter.include_javascript?
 
         auto_include_filter.include_javascript!
+
+        # User defined method to whitelist the script sha-256 when using CSP
+        if defined?(CoreExtensions::IntercomRails::AutoInclude.csp_sha256_hook) == 'method'
+          CoreExtensions::IntercomRails::AutoInclude.csp_sha256_hook(controller, auto_include_filter.csp_sha256)
+        end
       end
 
       attr_reader :controller
@@ -25,7 +32,9 @@ module IntercomRails
       end
 
       def include_javascript!
-        response.body = response.body.gsub(CLOSING_BODY_TAG, intercom_script_tag.output + '\\0')
+        split = response.body.split("</body>")
+        response.body = split.first + intercom_script_tag.to_s + "</body>"
+        response.body = response.body + split.last if split.size > 1
       end
 
       def include_javascript?
@@ -34,6 +43,10 @@ module IntercomRails
         html_content_type? &&
         response_has_closing_body_tag? &&
         intercom_script_tag.valid?
+      end
+
+      def csp_sha256
+        intercom_script_tag.csp_sha256
       end
 
       private
@@ -54,7 +67,19 @@ module IntercomRails
       end
 
       def intercom_script_tag
-        @script_tag ||= ScriptTag.new(:find_current_user_details => true, :find_current_company_details => true, :controller => controller, :show_everywhere => show_everywhere?)
+        options = {
+          :find_current_user_details => true,
+          :find_current_company_details => true,
+          :controller => controller,
+          :show_everywhere => show_everywhere?
+        }
+        # User defined method for applying a nonce to the inserted js tag when
+        # using CSP
+        if defined?(CoreExtensions::IntercomRails::AutoInclude.csp_nonce_hook) == 'method'
+          nonce = CoreExtensions::IntercomRails::AutoInclude.csp_nonce_hook(controller)
+          options.merge!(:nonce => nonce)
+        end
+        @script_tag = ScriptTag.new(options)
       end
 
       def show_everywhere?

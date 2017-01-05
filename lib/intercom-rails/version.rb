@@ -1,3 +1,3 @@
 module IntercomRails
-  VERSION = "0.2.28"
+  VERSION = "0.3.4"
 end

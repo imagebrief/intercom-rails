@@ -3,6 +3,13 @@ IntercomRails.config do |config|
   #
   config.app_id = ENV["INTERCOM_APP_ID"] || "<%= @app_id %>"
 
+  # == Intercom session_duration
+  #
+  <%- if @session_duration -%>
+  config.session_duration = <%= @session_duration %>
+  <%- else -%>
+  # config.session_duration = 300000
+  <%- end -%>
   # == Intercom secret key
   # This is required to enable secure mode, you can find it on your Setup
   # guide in the "Secure Mode" step.
@@ -11,16 +18,6 @@ IntercomRails.config do |config|
   config.api_secret = "<%= @api_secret %>"
   <%- else -%>
   # config.api_secret = "..."
-  <%- end -%>
-
-  # == Intercom API Key
-  # This is required for some Intercom rake tasks like importing your users;
-  # you can generate one at https://app.intercom.io/apps/api_keys.
-  #
-  <%- if @api_key -%>
-  config.api_key = "<%= @api_key %>"
-  <%- else -%>
-  # config.api_key = "..."
   <%- end -%>
 
   # == Enabled Environments
@@ -36,6 +33,7 @@ IntercomRails.config do |config|
   config.user.current = Proc.new { <%= @current_user %> }
   <%- else -%>
   # config.user.current = Proc.new { current_user }
+  # config.user.current = [Proc.new { current_user }]
   <%- end -%>
 
   # == Include for logged out Users
@@ -51,6 +49,13 @@ IntercomRails.config do |config|
   # The class which defines your user model
   #
   # config.user.model = Proc.new { User }
+
+  # == Lead/custom attributes for non-signed up users
+  # Pass additional attributes to for potential leads or
+  # non-signed up users as an an array.
+  # Any attribute contained in config.user.lead_attributes can be used
+  # as custom attribute in the application.
+  # config.user.lead_attributes = %w(ref_data utm_source)
 
   # == Exclude users
   # A Proc that given a user returns true if the user should be excluded
@@ -68,19 +73,22 @@ IntercomRails.config do |config|
   #   :favorite_color => :favorite_color
   # }
 
-  # == User -> Company association
-  # A Proc that given a user returns an array of companies
-  # that the user belongs to.
-  #
-  # config.user.company_association = Proc.new { |user| user.companies.to_a }
-  # config.user.company_association = Proc.new { |user| [user.company] }
-
   # == Current company method/variable
   # The method/variable that contains the current company for the current user,
   # in your controllers. 'Companies' are generic groupings of users, so this
   # could be a company, app or group.
   #
   # config.company.current = Proc.new { current_company }
+  #
+  # Or if you are using devise you can just use the following config
+  #
+  # config.company.current = Proc.new { current_user.company }
+
+  # == Exclude company
+  # A Proc that given a company returns true if the company should be excluded
+  # from imports and Javascript inclusion, false otherwise.
+  #
+  # config.company.exclude_if = Proc.new { |app| app.subdomain == 'demo' }
 
   # == Company Custom Data
   # A hash of additional data you wish to send about a company.
@@ -111,4 +119,12 @@ IntercomRails.config do |config|
   # open the messenger.
   #
   # config.inbox.style = :custom
+  #
+  # If you'd like to use your own link activator CSS selector
+  # uncomment this line and clicks on any element that matches the query will
+  # open the messenger
+  # config.inbox.custom_activator = '.intercom'
+  #
+  # If you'd like to hide default launcher button uncomment this line
+  # config.hide_default_launcher = true
 end
